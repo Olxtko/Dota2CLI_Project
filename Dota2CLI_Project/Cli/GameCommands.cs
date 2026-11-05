@@ -6,7 +6,7 @@ public sealed class GameCommands(BattleGame game, HeroCatalog catalog) : IComman
 {
     public IEnumerable<ICommand> GetCommands() =>
     [
-        new StartBattle(game, catalog), new BattleAction(game), new BattleStatus(game)
+        new StartBattle(game, catalog), new BattleAction(game), new BattleStatus(game), new ShowHistory(game), new SaveBattle(game), new LoadBattle(game)
     ];
 }
 
@@ -36,14 +36,14 @@ internal sealed class StartBattle(BattleGame game, HeroCatalog catalog) : IComma
         else throw new ArgumentException("Використання: play або play <id героя> <id суперника>.");
         game.Start(playerId, opponentId);
         Console.WriteLine("Бій розпочато!\n" + game.Status());
-        Console.WriteLine("Дії: act attack | act heal | act status");
+        Console.WriteLine("Дії: act attack | act heal | act defend | act status");
     }
 }
 
 internal sealed class BattleAction(BattleGame game) : ICommand
 {
     public string Name => "act";
-    public string Usage => "act <attack|heal|status>";
+    public string Usage => "act <attack|heal|defend|status>";
     public string Description => "Виконати дію під час бою.";
     public void Execute(string[] args)
     {
@@ -58,4 +58,29 @@ internal sealed class BattleStatus(BattleGame game) : ICommand
     public string Usage => "status";
     public string Description => "Показати стан останнього бою.";
     public void Execute(string[] args) => Console.WriteLine(game.Status());
+}
+
+
+internal sealed class ShowHistory(BattleGame game) : ICommand
+{
+    public string Name => "history";
+    public string Usage => "history";
+    public string Description => "Показати повну історію дій поточного або останнього бою.";
+    public void Execute(string[] args) => Console.WriteLine(game.History());
+}
+
+internal sealed class SaveBattle(BattleGame game) : ICommand
+{
+    public string Name => "save";
+    public string Usage => "save";
+    public string Description => "Зберегти поточний стан бою.";
+    public void Execute(string[] args) { game.Save(); Console.WriteLine("Стан бою збережено."); }
+}
+
+internal sealed class LoadBattle(BattleGame game) : ICommand
+{
+    public string Name => "load";
+    public string Usage => "load";
+    public string Description => "Завантажити останній збережений бій.";
+    public void Execute(string[] args) { game.Load(); Console.WriteLine("Бій завантажено." + Environment.NewLine + game.Status()); }
 }

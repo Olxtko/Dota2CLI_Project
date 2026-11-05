@@ -65,7 +65,7 @@ internal sealed class ShowHero(HeroCatalog catalog) : ICommand
     {
         if (args.Length == 0) throw new ArgumentException("Приклад: hero axe або hero \"Crystal Maiden\"");
         var h = catalog.Find(string.Join(' ', args)) ?? throw new InvalidOperationException("Героя не знайдено.");
-        Console.WriteLine($"ID: {h.Id}\nІм'я: {h.Name}\nАтрибут: {h.Attribute}\nТип атаки: {h.AttackType}\nHP: {h.MaxHp}\nАтака: {h.Attack}\nГрафіка: {h.ArtworkUrl}");
+        Console.WriteLine($"ID: {h.Id}\nІм'я: {h.Name}\nАтрибут: {h.Attribute}\nТип атаки: {h.AttackType}\nHP: {h.MaxHp}\nАтака: {h.Attack}\nБроня: {h.Armor}\nОпір: {h.Resist:P0}\nШвидкість: {h.Speed}\nГрафіка: {h.ArtworkUrl}");
     }
 }
 
@@ -92,8 +92,14 @@ internal sealed class CreateHero(HeroCatalog catalog) : ICommand
             throw new ArgumentException("HP має бути додатним цілим числом.");
         if (!int.TryParse(Ask("Сила атаки: "), out int attack) || attack < 1)
             throw new ArgumentException("Атака має бути додатним цілим числом.");
+        if (!int.TryParse(Ask("Броня (ціле число від 0): "), out int armor) || armor < 0)
+            throw new ArgumentException("Броня має бути невід'ємним цілим числом.");
+        if (!double.TryParse(Ask("Опір від 0 до 1 (наприклад, 0.15): "), out double resist) || resist < 0 || resist > 1)
+            throw new ArgumentException("Опір має бути числом від 0 до 1.");
+        if (!int.TryParse(Ask("Швидкість (наприклад, 100, 150 або 200): "), out int speed) || speed <= 0)
+            throw new ArgumentException("Швидкість має бути додатним цілим числом.");
         var url = Ask("Посилання на графіку (необов'язково): ");
-        catalog.Add(new Hero { Id=id, Name=name, Attribute=attribute, AttackType=type, MaxHp=hp, Attack=attack, ArtworkUrl=url });
+        catalog.Add(new Hero { Id=id, Name=name, Attribute=attribute, AttackType=type, MaxHp=hp, Attack=attack, Armor=armor, Resist=resist, Speed=speed, ArtworkUrl=url });
         Console.WriteLine($"Героя {name} додано та збережено.");
     }
 }

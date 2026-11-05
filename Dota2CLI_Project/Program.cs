@@ -10,8 +10,9 @@ internal static class Program
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
         var store = new JsonDataStore("Data");
-        var catalog = new HeroCatalog(store);
-        var game = new BattleGame(store, catalog);
+        using var apiClient = new OpenDotaHeroApiClient();
+        var catalog = new HeroCatalog(store, apiClient);
+        var game = new BattleGame(store, store, catalog);
         var cli = new CommandLineInterface();
 
         cli.UseStrategy(new CatalogCommands(catalog));

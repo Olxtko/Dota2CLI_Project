@@ -1,0 +1,2 @@
+C:\Users\dufik\OneDrive\Desktop\Dota2CLI_Project\publish\win-x64\Dota2CLI.runtimeconfig.json
+C:\Users\dufik\OneDrive\Desktop\Dota2CLI_Project\publish\win-x64\Dota2GUI.exe

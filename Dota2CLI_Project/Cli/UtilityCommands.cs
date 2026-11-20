@@ -1,10 +1,11 @@
 using Dota2CLI.Core;
+using Dota2CLI.Data;
 
 namespace Dota2CLI.Cli;
 
-public sealed class UtilityCommands(HeroCatalog catalog) : ICommandStrategy
+public sealed class UtilityCommands(HeroCatalog catalog, JsonDataStore store) : ICommandStrategy
 {
-    public IEnumerable<ICommand> GetCommands() => [new SearchHeroes(catalog), new ShowResults()];
+    public IEnumerable<ICommand> GetCommands() => [new SearchHeroes(catalog), new ShowResults(store.StorageDirectory)];
 }
 
 internal sealed class SearchHeroes(HeroCatalog catalog) : ICommand
@@ -25,14 +26,14 @@ internal sealed class SearchHeroes(HeroCatalog catalog) : ICommand
     }
 }
 
-internal sealed class ShowResults : ICommand
+internal sealed class ShowResults(string storageDirectory) : ICommand
 {
     public string Name => "results";
     public string Usage => "results";
     public string Description => "Показати історію результатів боїв.";
     public void Execute(string[] args)
     {
-        var path = Path.GetFullPath(Path.Combine("Data", "game-results.txt"));
+        var path = Path.Combine(storageDirectory, "game-results.txt");
         Console.WriteLine(File.Exists(path) ? File.ReadAllText(path) : "Збережених результатів ще немає.");
     }
 }

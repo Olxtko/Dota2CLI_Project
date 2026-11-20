@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Dota2CLI.Core;
 
@@ -82,19 +83,32 @@ internal sealed class CreateHero(HeroCatalog catalog) : ICommand
         var id = Ask("ID (латиниця, цифри, дефіс): ").ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(id) || id.Any(ch => !(char.IsAsciiLetterOrDigit(ch) || ch == '-')))
             throw new ArgumentException("ID може містити латинські літери, цифри та дефіс.");
-        var attribute = Ask("Основний атрибут (Strength/Agility/Intelligence/Universal): ");
-        if (!new[] { "Strength", "Agility", "Intelligence", "Universal" }.Contains(attribute, StringComparer.OrdinalIgnoreCase))
-            throw new ArgumentException("Вкажіть Strength, Agility, Intelligence або Universal.");
-        var type = Ask("Тип атаки (Melee/Ranged): ");
-        if (!new[] { "Melee", "Ranged" }.Contains(type, StringComparer.OrdinalIgnoreCase))
-            throw new ArgumentException("Вкажіть Melee або Ranged.");
+        var attributeInput = Ask("Основний атрибут (Сила/Спритність/Інтелект/Універсальний): ");
+        var attribute = attributeInput.Trim().ToLowerInvariant() switch
+        {
+            "сила" => "Strength",
+            "спритність" => "Agility",
+            "інтелект" => "Intelligence",
+            "універсальний" => "Universal",
+            _ => throw new ArgumentException("Вкажіть Сила, Спритність, Інтелект або Універсальний.")
+        };
+        var typeInput = Ask("Тип атаки (Ближній/Дальній): ");
+        var type = typeInput.Trim().ToLowerInvariant() switch
+        {
+            "ближній" => "Melee",
+            "дальній" => "Ranged",
+            _ => throw new ArgumentException("Вкажіть Ближній або Дальній тип атаки.")
+        };
         if (!int.TryParse(Ask("Максимальне HP: "), out int hp) || hp < 1)
             throw new ArgumentException("HP має бути додатним цілим числом.");
         if (!int.TryParse(Ask("Сила атаки: "), out int attack) || attack < 1)
             throw new ArgumentException("Атака має бути додатним цілим числом.");
         if (!int.TryParse(Ask("Броня (ціле число від 0): "), out int armor) || armor < 0)
             throw new ArgumentException("Броня має бути невід'ємним цілим числом.");
-        if (!double.TryParse(Ask("Опір від 0 до 1 (наприклад, 0.15): "), out double resist) || resist < 0 || resist > 1)
+        var resistInput = Ask("Опір від 0 до 1 (наприклад, 0.15 або 0,15): ");
+        if ((!double.TryParse(resistInput, NumberStyles.Float, CultureInfo.InvariantCulture, out double resist) &&
+             !double.TryParse(resistInput, NumberStyles.Float, CultureInfo.CurrentCulture, out resist)) ||
+            double.IsNaN(resist) || double.IsInfinity(resist) || resist < 0 || resist > 1)
             throw new ArgumentException("Опір має бути числом від 0 до 1.");
         if (!int.TryParse(Ask("Швидкість (наприклад, 100, 150 або 200): "), out int speed) || speed <= 0)
             throw new ArgumentException("Швидкість має бути додатним цілим числом.");

@@ -13,18 +13,22 @@ public sealed class Hero
     public int Speed { get; set; } = 100;
     public string ArtworkUrl { get; set; } = "";
     public string Description { get; set; } = "";
+    public bool IsUserCreated { get; set; }
 
     public Hero Copy() => new()
     {
         Id = Id, Name = Name, Attribute = Attribute, AttackType = AttackType,
         MaxHp = MaxHp, Attack = Attack, Armor = Armor, Resist = Resist,
-        Speed = Speed, ArtworkUrl = ArtworkUrl, Description = Description
+        Speed = Speed, ArtworkUrl = ArtworkUrl, Description = Description,
+        IsUserCreated = IsUserCreated
     };
 
     public void Validate()
     {
         if (string.IsNullOrWhiteSpace(Id)) throw new ArgumentException("ID персонажа не може бути порожнім.");
         if (string.IsNullOrWhiteSpace(Name)) throw new ArgumentException("Ім'я персонажа не може бути порожнім.");
+        if (string.IsNullOrWhiteSpace(Attribute)) throw new ArgumentException("Атрибут персонажа не може бути порожнім.");
+        if (string.IsNullOrWhiteSpace(AttackType)) throw new ArgumentException("Тип атаки не може бути порожнім.");
         if (MaxHp <= 0) throw new ArgumentOutOfRangeException(nameof(MaxHp), "MaxHp має бути більшим за 0.");
         if (Attack < 0 || Armor < 0) throw new ArgumentException("Атака та броня не можуть бути від'ємними.");
         if (double.IsNaN(Resist) || double.IsInfinity(Resist) || Resist < 0 || Resist > 1)

@@ -33,20 +33,51 @@ public sealed class BattleGame(
     public void Load()
     {
         var loaded = stateRepository.LoadGame() ?? throw new InvalidOperationException("Збереженого бою немає.");
+        if (string.IsNullOrWhiteSpace(loaded.PlayerHeroId) || string.IsNullOrWhiteSpace(loaded.OpponentHeroId))
+            throw new InvalidDataException("У збереженні відсутні ID учасників бою.");
+
         loaded.PlayerProfile ??= catalog.Find(loaded.PlayerHeroId)?.Copy();
         loaded.OpponentProfile ??= catalog.Find(loaded.OpponentHeroId)?.Copy();
         if (loaded.PlayerProfile is null || loaded.OpponentProfile is null)
-            throw new InvalidOperationException("Не вдалося відновити профілі персонажів збереженого бою.");
-        loaded.PlayerProfile.Validate();
-        loaded.OpponentProfile.Validate();
+            throw new InvalidDataException("Не вдалося відновити профілі персонажів збереженого бою.");
+
+        try
+        {
+            loaded.PlayerProfile.Validate();
+            loaded.OpponentProfile.Validate();
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidDataException("Збереження містить персонажа з некоректними характеристиками.", ex);
+        }
+
         if (!loaded.PlayerProfile.Id.Equals(loaded.PlayerHeroId, StringComparison.OrdinalIgnoreCase) ||
             !loaded.OpponentProfile.Id.Equals(loaded.OpponentHeroId, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("ID профілів не відповідають ID учасників збереженого бою.");
+
         if (loaded.Turn < 1 || loaded.PlayerHp < 0 || loaded.OpponentHp < 0 ||
             loaded.PlayerHp > loaded.PlayerProfile.MaxHp || loaded.OpponentHp > loaded.OpponentProfile.MaxHp ||
-            (!loaded.IsFinished && (loaded.PlayerHp == 0 || loaded.OpponentHp == 0)))
-            throw new InvalidDataException("Збережений стан бою містить некоректні значення HP або номера раунду.");
+            (!loaded.IsFinished && (loaded.PlayerHp == 0 || loaded.OpponentHp == 0)) ||
+            (loaded.IsFinished && ((loaded.PlayerHp == 0) == (loaded.OpponentHp == 0))) ||
+            string.IsNullOrWhiteSpace(loaded.Result) ||
+            (!loaded.IsFinished && !loaded.Result.Equals("Гра триває", StringComparison.Ordinal)) ||
+            (loaded.IsFinished && !loaded.Result.StartsWith("Переміг ", StringComparison.Ordinal)))
+            throw new InvalidDataException("Збережений стан бою містить некоректні значення HP, результату або номера раунду.");
+
         loaded.History ??= [];
+        if (loaded.History.Any(x => x is null || x.Turn < 1 || x.Turn > loaded.Turn || x.Sequence < 1 ||
+            string.IsNullOrWhiteSpace(x.Actor) || string.IsNullOrWhiteSpace(x.Action) ||
+            !new[] { "attack", "heal", "defend" }.Contains(x.Action, StringComparer.OrdinalIgnoreCase) ||
+            x.Damage < 0 || x.Healing < 0 || (x.Damage > 0 && x.Healing > 0) || string.IsNullOrWhiteSpace(x.Message)))
+            throw new InvalidDataException("Історія збереженого бою містить некоректні записи.");
+
+        foreach (var group in loaded.History.GroupBy(x => x.Turn))
+        {
+            var sequences = group.Select(x => x.Sequence).OrderBy(x => x).ToArray();
+            if (!sequences.SequenceEqual(Enumerable.Range(1, sequences.Length)))
+                throw new InvalidDataException("Порядкові номери дій в історії збереженого бою некоректні.");
+        }
+
         _state = loaded;
     }
 

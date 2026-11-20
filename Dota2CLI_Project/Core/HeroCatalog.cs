@@ -24,10 +24,20 @@ public sealed class HeroCatalog : IHeroCatalog
 
         foreach (var localHero in previousHeroes)
         {
-            bool existsRemotely = remoteHeroes.Any(h =>
+            int existingIndex = remoteHeroes.FindIndex(h =>
                 h.Id.Equals(localHero.Id, StringComparison.OrdinalIgnoreCase) ||
                 h.Name.Equals(localHero.Name, StringComparison.OrdinalIgnoreCase));
-            if (!existsRemotely) remoteHeroes.Add(localHero.Copy());
+            if (localHero.IsUserCreated)
+            {
+                if (existingIndex >= 0)
+                    remoteHeroes[existingIndex] = localHero.Copy();
+                else
+                    remoteHeroes.Add(localHero.Copy());
+            }
+            else if (existingIndex < 0)
+            {
+                remoteHeroes.Add(localHero.Copy());
+            }
         }
 
         _repository.SaveHeroes(remoteHeroes);
@@ -55,8 +65,10 @@ public sealed class HeroCatalog : IHeroCatalog
         hero.Validate();
         if (Find(hero.Id) is not null || Find(hero.Name) is not null)
             throw new InvalidOperationException("Герой із таким ID або ім'ям уже існує.");
-        var updated = _heroes.Select(x => x.Copy()).Append(hero.Copy()).ToList();
+        var createdHero = hero.Copy();
+        createdHero.IsUserCreated = true;
+        var updated = _heroes.Select(x => x.Copy()).Append(createdHero).ToList();
         _repository.SaveHeroes(updated);
-        _heroes.Add(hero.Copy());
+        _heroes.Add(createdHero.Copy());
     }
 }

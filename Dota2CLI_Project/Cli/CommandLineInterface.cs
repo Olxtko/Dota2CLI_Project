@@ -41,7 +41,7 @@ public sealed class CommandLineInterface
             return;
         }
         try { command.Execute(parts.Skip(1).ToArray()); }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException)
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or IOException or InvalidDataException)
         { Console.WriteLine($"Помилка: {ex.Message}"); }
     }
 

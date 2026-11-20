@@ -8,13 +8,18 @@ public sealed class JsonDataStore : IHeroRepository, IGameStateRepository, IGame
     private readonly string _directory;
     private readonly JsonSerializerOptions _options = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
 
-    public JsonDataStore(string directory)
+    public JsonDataStore(string? directory = null)
     {
-        _directory = Path.GetFullPath(directory);
+        _directory = Path.GetFullPath(directory ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Dota2CLI"));
         Directory.CreateDirectory(_directory);
     }
 
+    public string StorageDirectory => _directory;
+
     private string PathFor(string file) => Path.Combine(_directory, file);
+
+    public bool HasSavedGame => File.Exists(PathFor("game-state.json"));
 
     public List<Hero> LoadHeroes()
     {
@@ -28,8 +33,23 @@ public sealed class JsonDataStore : IHeroRepository, IGameStateRepository, IGame
 
         try
         {
-            var heroes = JsonSerializer.Deserialize<List<Hero>>(File.ReadAllText(path), _options) ?? new();
-            foreach (var hero in heroes) hero.Validate();
+            var heroes = JsonSerializer.Deserialize<List<Hero>>(File.ReadAllText(path), _options)
+                ?? throw new InvalidDataException("Файл каталогу не містить списку персонажів.");
+            if (heroes.Any(hero => hero is null))
+                throw new InvalidDataException("Файл каталогу містить порожній запис персонажа.");
+            foreach (var hero in heroes)
+            {
+                try
+                {
+                    hero.Validate();
+                }
+                catch (ArgumentException ex)
+                {
+                    throw new InvalidDataException("Файл каталогу містить персонажа з некоректними характеристиками.", ex);
+                }
+            }
+            if (heroes.Select(h => h.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != heroes.Count)
+                throw new InvalidDataException("Файл каталогу містить повторювані ID персонажів.");
             return heroes;
         }
         catch (JsonException ex)
@@ -38,17 +58,39 @@ public sealed class JsonDataStore : IHeroRepository, IGameStateRepository, IGame
         }
     }
 
-    public void SaveHeroes(List<Hero> heroes) => WriteJsonAtomically("heroes.json", heroes);
+    public void SaveHeroes(List<Hero> heroes)
+    {
+        ArgumentNullException.ThrowIfNull(heroes);
+        foreach (var hero in heroes)
+        {
+            ArgumentNullException.ThrowIfNull(hero);
+            hero.Validate();
+        }
+        if (heroes.Select(h => h.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != heroes.Count)
+            throw new InvalidDataException("Неможливо зберегти каталог: ID персонажів мають бути унікальними.");
+        WriteJsonAtomically("heroes.json", heroes);
+    }
 
     public GameState? LoadGame()
     {
         var path = PathFor("game-state.json");
         if (!File.Exists(path)) return null;
-        try { return JsonSerializer.Deserialize<GameState>(File.ReadAllText(path), _options); }
-        catch (JsonException ex) { throw new InvalidDataException($"Файл збереження '{path}' містить некоректний JSON.", ex); }
+        try
+        {
+            return JsonSerializer.Deserialize<GameState>(File.ReadAllText(path), _options)
+                ?? throw new InvalidDataException($"Файл збереження '{path}' порожній або не містить стану гри.");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException($"Файл збереження '{path}' містить некоректний JSON.", ex);
+        }
     }
 
-    public void SaveGame(GameState state) => WriteJsonAtomically("game-state.json", state);
+    public void SaveGame(GameState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        WriteJsonAtomically("game-state.json", state);
+    }
 
     public void SaveResult(string result) =>
         File.AppendAllText(PathFor("game-results.txt"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} | {result}{Environment.NewLine}");
@@ -56,10 +98,17 @@ public sealed class JsonDataStore : IHeroRepository, IGameStateRepository, IGame
     private void WriteJsonAtomically<T>(string fileName, T value)
     {
         var path = PathFor(fileName);
-        var tempPath = path + ".tmp";
-        var json = JsonSerializer.Serialize(value, _options);
-        File.WriteAllText(tempPath, json);
-        File.Move(tempPath, path, overwrite: true);
+        var tempPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            var json = JsonSerializer.Serialize(value, _options);
+            File.WriteAllText(tempPath, json, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            File.Move(tempPath, path, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
     }
 
     private static List<Hero> CreateDefaultHeroes() =>

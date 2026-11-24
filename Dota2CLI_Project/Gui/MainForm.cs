@@ -12,6 +12,7 @@ public sealed class MainForm : Form
     private readonly OpenDotaHeroApiClient _api;
     private readonly HeroCatalog _catalog;
     private readonly BattleGame _game;
+    private readonly PortraitCache _portraitCache = new();
     private readonly TabControl _tabs = new() { Dock = DockStyle.Fill };
     private readonly FlowLayoutPanel _heroCards = new()
     {
@@ -204,8 +205,16 @@ public sealed class MainForm : Form
             SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(235, 238, 243),
             ErrorImage = SystemIcons.Warning.ToBitmap()
         };
-        if (Uri.TryCreate(hero.ArtworkUrl, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
-            picture.LoadAsync(uri.ToString());
+        if (Uri.TryCreate(hero.ArtworkUrl, UriKind.Absolute, out var uri) &&
+            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+        {
+            var artworkUrl = uri.ToString();
+            var cachedPath = _portraitCache.Find(artworkUrl);
+            if (cachedPath is not null)
+                SetPortrait(picture, cachedPath);
+            else
+                _ = DownloadAndCachePortrait(picture, artworkUrl);
+        }
         var name = new Label
         {
             Text = hero.Name, Location = new Point(14, 148), Width = 235, Height = 28,
@@ -221,6 +230,43 @@ public sealed class MainForm : Form
         card.Controls.Add(name);
         card.Controls.Add(info);
         return card;
+    }
+
+
+    private async Task DownloadAndCachePortrait(PictureBox picture, string artworkUrl)
+    {
+        try
+        {
+            var path = await _portraitCache.GetOrDownloadAsync(artworkUrl);
+            if (picture.IsDisposed) return;
+
+            if (picture.InvokeRequired && picture.IsHandleCreated)
+                picture.BeginInvoke(new Action(() => SetPortrait(picture, path)));
+            else if (!picture.InvokeRequired)
+                SetPortrait(picture, path);
+        }
+        catch
+        {
+            // Якщо зображення недоступне, картка залишається з фоновою заглушкою.
+        }
+    }
+
+    private static void SetPortrait(PictureBox picture, string path)
+    {
+        if (picture.IsDisposed || !File.Exists(path)) return;
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var source = Image.FromStream(stream);
+            var image = new Bitmap(source);
+            var previous = picture.Image;
+            picture.Image = image;
+            previous?.Dispose();
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or OutOfMemoryException)
+        {
+            // Пошкоджений кешований файл буде завантажено повторно під час наступного оновлення.
+        }
     }
 
     private void StartBattle()
